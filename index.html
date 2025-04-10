@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Marker-Based AR Plant</title>
+    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.3.2/aframe/build/aframe-ar.min.js"></script>
+  </head>
+  <body style="margin: 0; overflow: hidden;">
+    <a-scene embedded arjs>
+      <!-- Hiro Marker -->
+      <a-marker type="pattern" url="markers/hiro.patt">
+        <a-entity
+          gltf-model="models/plant.glb"
+          scale="0.3 0.3 0.3"
+          position="0 0 0">
+        </a-entity>
+      </a-marker>
+      <a-entity camera></a-entity>
+    </a-scene>
+  </body>
+</html>
