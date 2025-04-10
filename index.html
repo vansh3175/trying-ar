@@ -1,23 +1,53 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <title>AR Cube with Marker</title>
-    <script src="https://aframe.io/releases/1.4.1/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
-    <script src="https://raw.githack.com/AR-js/AR.js/master/aframe/build/ar-js-aframe.min.js"></script>
-</head>
+<html>
+  <head>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <style>
+      /* Simple UI */
+      #info-panel {
+        position: fixed;
+        bottom: 10px;
+        left: 10px;
+        background: white;
+        padding: 10px;
+        border-radius: 5px;
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- AR Scene -->
+    <a-scene embedded arjs="sourceType: webcam;">
+      <!-- Marker-based AR (we'll use a simple pattern) -->
+      <a-marker preset="hiro">
+        <!-- Plant will appear here when marker is detected -->
+        <a-entity gltf-model="url(plant.glb)" scale="0.5 0.5 0.5" class="clickable-plant"></a-entity>
+      </a-marker>
+      <a-entity camera></a-entity>
+    </a-scene>
 
-<body style="margin: 0; overflow: hidden;" onload="init()">
-  <a-scene
-    vr-mode-button="enabled: true"
-    renderer="antialias: true; gammaInput: true; gammaOutput: true"
-    id="ar-scene"
-    arjs="trackingMethod: image; trackingMethod: marker; markerSource: marker.png;
-        debug: false"
-  >
-    <a-entity id="cube" geometry="primitive: box; width: 0.2; height: 0.2; depth: 0.2"
-              material="color: blue;"></a-entity>
-  </a-scene>
-</body>
+    <!-- Info Panel (hidden by default) -->
+    <div id="info-panel">
+      <h2 id="plant-name">Plant Name</h2>
+      <p id="plant-uses">Medicinal info here...</p>
+    </div>
+
+    <script>
+      document.querySelector(".clickable-plant").addEventListener("click", (e) => {
+      const infoPanel = document.getElementById("info-panel");
+      
+      // Update plant info
+      document.getElementById("plant-name").innerText = "Aloe Vera";
+      document.getElementById("plant-uses").innerText = 
+        "Heals burns, soothes skin, and aids digestion!";
+      
+      // Show the panel
+      infoPanel.style.display = "block";
+      
+      // Hide after 5 seconds
+      setTimeout(() => { infoPanel.style.display = "none"; }, 5000);
+    });
+    </script>
+  </body>
 </html>
