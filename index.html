@@ -1,56 +1,52 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-    <style>
-      #info-panel {
-        position: fixed;
-        bottom: 10px;
-        left: 10px;
-        background: white;
-        padding: 10px;
-        border-radius: 5px;
-        display: none;
-        z-index: 9999;
-      }
-    </style>
-  </head>
-  <body>
-    <a-scene 
-      embedded 
-      arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: true;"
-      gesture-detector
-    >
-      <!-- Cursor (black dot) -->
-      <a-cursor rayOrigin="mouse"></a-cursor>
+<head>
+  <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+  <style>
+    #info-panel {
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      background: white;
+      padding: 10px;
+      border-radius: 5px;
+      z-index: 9999;
+    }
+  </style>
+</head>
+<body>
+  <!-- SIMPLIFIED SCENE - No surface detection -->
+  <a-scene embedded arjs="sourceType: webcam;">
+    <!-- Plant container (hidden by default) -->
+    <a-entity id="plant-container">
+      <a-entity id="plant" gltf-model="url(./plant.glb)" scale="0.5 0.5 0.5" visible="false"></a-entity>
+    </a-entity>
+    
+    <a-entity camera></a-entity>
+  </a-scene>
 
-      <!-- Plant (hidden by default) -->
-      <a-entity id="dynamic-plant" visible="false">
-        <!-- Replace with your GLB model or test URL -->
-        <a-entity gltf-model="https://cdn.glitch.com/fe9d5a5d-5b57-4e3b-9f25-9b36f5b40d8e%2Fscene.glb" scale="0.5 0.5 0.5"></a-entity>
-      </a-entity>
+  <div id="info-panel">
+    <h2>Aloe Vera</h2>
+    <p>Click anywhere to place me!</p>
+  </div>
 
-      <!-- Camera -->
-      <a-entity camera></a-entity>
-    </a-scene>
-
-    <!-- Info Panel -->
-    <div id="info-panel">
-      <h2 id="plant-name">Aloe Vera</h2>
-      <p id="plant-uses">Heals burns and soothes skin!</p>
-    </div>
-
-    <script>
-      // Tap to place plant (mobile-friendly)
-      document.querySelector("a-scene").addEventListener("touchstart", (e) => {
-        const plant = document.getElementById("dynamic-plant");
-        if (e.detail.intersection?.point) {
-          plant.setAttribute("position", e.detail.intersection.point);
-          plant.setAttribute("visible", "true");
-          document.getElementById("info-panel").style.display = "block";
-        }
-      });
-    </script>
-  </body>
+  <script>
+    const scene = document.querySelector('a-scene');
+    const plant = document.getElementById('plant');
+    
+    // Place plant at click position (no surface detection)
+    scene.addEventListener('click', (e) => {
+      // Get screen coordinates
+      const x = (e.clientX / window.innerWidth) * 2 - 1;
+      const y = -(e.clientY / window.innerHeight) * 2 + 1;
+      
+      // Place plant 1 meter in front of camera
+      plant.setAttribute('position', {x: x, y: y, z: -1});
+      plant.setAttribute('visible', 'true');
+      
+      console.log(`Planted at: X=${x.toFixed(2)}, Y=${y.toFixed(2)}`);
+    });
+  </script>
+</body>
 </html>
