@@ -1,14 +1,25 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <title>AR Plant Placement</title>
   <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <style>
+    #debug {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.7);
+      color: white;
+      padding: 10px;
+      font-family: monospace;
+      z-index: 10000;
+    }
     #info-panel {
       position: fixed;
       bottom: 10px;
       left: 10px;
-      background: white;
+      background: rgba(255,255,255,0.9);
       padding: 10px;
       border-radius: 5px;
       z-index: 9999;
@@ -16,36 +27,75 @@
   </style>
 </head>
 <body>
-  <!-- SIMPLIFIED SCENE - No surface detection -->
-  <a-scene embedded arjs="sourceType: webcam;">
-    <!-- Plant container (hidden by default) -->
-    <a-entity id="plant-container">
-      <a-entity id="plant" gltf-model="url(./plant.glb)" scale="0.5 0.5 0.5" visible="false"></a-entity>
-    </a-entity>
+  <!-- AR Scene with surface detection -->
+  <a-scene 
+    embedded 
+    arjs="sourceType: webcam; trackingMethod: best; debugUIEnabled: true;"
+    vr-mode-ui="enabled: false"
+  >
+    <!-- Cursor that sticks to surfaces -->
+    <a-cursor 
+      id="cursor"
+      rayOrigin="mouse"
+      fuse="false"
+      material="color: yellow; shader: flat"
+      geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.016"
+      raycaster="objects: [data-surface]"
+      cursor-listener
+    ></a-cursor>
+    
+    <!-- Plant (initially hidden) -->
+    <a-entity 
+      id="plant"
+      gltf-model="url(./plant.glb)"
+      scale="0.5 0.5 0.5"
+      visible="false"
+      shadow
+      data-surface
+    ></a-entity>
     
     <a-entity camera></a-entity>
   </a-scene>
 
+  <!-- Debug info -->
+  <div id="debug">Waiting for surface detection...</div>
+  
+  <!-- Info panel -->
   <div id="info-panel">
     <h2>Aloe Vera</h2>
-    <p>Click anywhere to place me!</p>
+    <p>Point at a flat surface and tap!</p>
   </div>
 
   <script>
-    const scene = document.querySelector('a-scene');
+    // Debugging setup
+    const debugEl = document.getElementById('debug');
+    const cursor = document.getElementById('cursor');
     const plant = document.getElementById('plant');
+    let lastPosition = null;
     
-    // Place plant at click position (no surface detection)
-    scene.addEventListener('click', (e) => {
-      // Get screen coordinates
-      const x = (e.clientX / window.innerWidth) * 2 - 1;
-      const y = -(e.clientY / window.innerHeight) * 2 + 1;
-      
-      // Place plant 1 meter in front of camera
-      plant.setAttribute('position', {x: x, y: y, z: -1});
-      plant.setAttribute('visible', 'true');
-      
-      console.log(`Planted at: X=${x.toFixed(2)}, Y=${y.toFixed(2)}`);
+    // Update debug info every second
+    setInterval(() => {
+      const pos = plant.getAttribute('position');
+      debugEl.innerHTML = `Surface Tracking: ${lastPosition ? '✅' : '❌ (Move phone slowly)'}<br>
+                          Plant Position: ${pos ? `${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)}` : 'Not placed'}`;
+    }, 1000);
+    
+    // Handle surface placement
+    AFRAME.registerComponent('cursor-listener', {
+      init: function() {
+        this.el.addEventListener('click', (evt) => {
+          if (evt.detail.intersection) {
+            lastPosition = evt.detail.intersection.point;
+            plant.setAttribute('position', lastPosition);
+            plant.setAttribute('visible', 'true');
+            
+            // Make plant stand upright (adjust Y rotation as needed)
+            plant.setAttribute('rotation', {x: 0, y: 0, z: 0});
+            
+            console.log('Plant placed at:', lastPosition);
+          }
+        });
+      }
     });
   </script>
 </body>
