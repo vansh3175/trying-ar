@@ -4,6 +4,17 @@
   <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <style>
+    /* Pulsing cursor that responds to surfaces */
+    #cursor {
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.7; }
+      100% { opacity: 1; }
+    }
+    
+    /* Debug panel */
     #debug {
       position: fixed;
       top: 10px;
@@ -13,14 +24,7 @@
       padding: 10px;
       font-family: monospace;
       z-index: 10000;
-    }
-    #cursor {
-      animation: pulse 1s infinite;
-    }
-    @keyframes pulse {
-      0% { opacity: 1; }
-      50% { opacity: 0.5; }
-      100% { opacity: 1; }
+      border-radius: 5px;
     }
   </style>
 </head>
@@ -28,31 +32,31 @@
   <a-scene 
     embedded 
     arjs="sourceType: webcam; trackingMethod: best; debugUIEnabled: true"
+    vr-mode-ui="enabled: false"
     renderer="logarithmicDepthBuffer: true;"
   >
-    <!-- Enhanced cursor with visual feedback -->
+    <!-- Surface-detecting cursor -->
     <a-entity id="cursor"
-      cursor="rayOrigin: mouse"
-      raycaster="objects: [data-ar-surface]; far: 100;"
-      geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.016"
-      material="color: #00FF00; shader: flat"
-      position="0 0 -1"
+      cursor="rayOrigin: mouse; fuse: false"
+      raycaster="objects: [data-ar-surface]; far: 20; interval: 100"
+      geometry="primitive: ring; radiusInner: 0.015; radiusOuter: 0.02"
+      material="color: #FFAA00; shader: flat; opacity: 0.8"
+      position="0 0 -0.5"
       data-ar-surface
     ></a-entity>
 
-    <!-- Plant with physics for realistic placement -->
+    <!-- Plant model -->
     <a-entity id="plant"
       gltf-model="url(./plant.glb)"
-      scale="0.5 0.5 0.5"
+      scale="0.3 0.3 0.3"
       visible="false"
       shadow
-      data-ar-surface
     ></a-entity>
 
     <a-entity camera></a-entity>
   </a-scene>
 
-  <div id="debug">Initializing AR...</div>
+  <div id="debug">Initializing AR - move your phone slowly...</div>
 
   <script>
     const scene = document.querySelector('a-scene');
@@ -60,65 +64,49 @@
     const plant = document.getElementById('plant');
     const debugEl = document.getElementById('debug');
     
-    // Debug states
-    let trackingStarted = false;
-    let lastIntersection = null;
-    
-    // Configure raycaster properly
-    cursor.components.raycaster.far = 10;
-    cursor.components.raycaster.near = 0.05;
-    cursor.components.raycaster.showLine = true;
-    
-    // Scene loaded handler
+    // 1. WAIT FOR SCENE TO LOAD
     scene.addEventListener('loaded', () => {
-      debugEl.textContent = "AR ready - scan surfaces slowly";
+      debugEl.textContent = "Scan surfaces - point at textured areas";
       
-      // Visual feedback when surfaces are detected
-      scene.addEventListener('markerFound', () => {
-        trackingStarted = true;
-        cursor.setAttribute('material', 'color', '#00FF00');
+      // 2. CONFIGURE RAYCASTER PROPERLY
+      const raycaster = cursor.components.raycaster;
+      raycaster.far = 10; // meters
+      raycaster.showLine = true;
+      raycaster.lineColor = 'red';
+      
+      // 3. SURFACE DETECTION FEEDBACK
+      raycaster.el.addEventListener('raycaster-intersection', (e) => {
+        cursor.setAttribute('material', 'color', '#00FF00'); // Green when surface found
+        debugEl.textContent = "✅ Surface detected - tap to place plant";
       });
       
-      scene.addEventListener('markerLost', () => {
-        cursor.setAttribute('material', 'color', '#FF0000');
+      raycaster.el.addEventListener('raycaster-intersection-cleared', (e) => {
+        cursor.setAttribute('material', 'color', '#FFAA00'); // Orange when no surface
+        debugEl.textContent = "⚠️ Move to a textured surface";
+      });
+      
+      // 4. CLICK HANDLER WITH VISUAL FEEDBACK
+      cursor.addEventListener('click', (e) => {
+        if (!e.detail.intersection) {
+          cursor.setAttribute('animation', 'property: material.color; to: red; dur: 200; easing: linear');
+          setTimeout(() => cursor.setAttribute('material', 'color', '#FFAA00'), 300);
+          return;
+        }
+        
+        // Place plant at intersection point
+        plant.setAttribute('position', e.detail.intersection.point);
+        plant.setAttribute('visible', 'true');
+        
+        // Visual confirmation
+        cursor.setAttribute('animation', 'property: material.color; to: #00FFFF; dur: 200; easing: linear');
+        setTimeout(() => cursor.setAttribute('material', 'color', '#00FF00'), 300);
+        
+        debugEl.innerHTML = `🌱 Plant placed!<br>
+                           X: ${e.detail.intersection.point.x.toFixed(2)}<br>
+                           Y: ${e.detail.intersection.point.y.toFixed(2)}<br>
+                           Z: ${e.detail.intersection.point.z.toFixed(2)}`;
       });
     });
-    
-    // Click handler with enhanced debugging
-    cursor.addEventListener('click', (e) => {
-      if (!e.detail.intersection) {
-        debugEl.textContent = "⚠️ No surface detected!\nMove phone slowly over textured surface";
-        cursor.setAttribute('material', 'color', '#FF0000');
-        return;
-      }
-      
-      lastIntersection = e.detail.intersection;
-      plant.setAttribute('position', lastIntersection.point);
-      
-      // Align plant with surface normal
-      plant.setAttribute('rotation', {
-        x: -Math.atan2(lastIntersection.face.normal.z, lastIntersection.face.normal.y) * (180/Math.PI),
-        y: 0,
-        z: 0
-      });
-      
-      plant.setAttribute('visible', 'true');
-      debugEl.innerHTML = `✅ Plant placed!<br>
-                          Position: ${lastIntersection.point.x.toFixed(2)}, 
-                          ${lastIntersection.point.y.toFixed(2)}, 
-                          ${lastIntersection.point.z.toFixed(2)}`;
-      
-      // Visual confirmation
-      cursor.setAttribute('material', 'color', '#00FF00');
-      setTimeout(() => cursor.setAttribute('material', 'color', '#FFFF00'), 200);
-    });
-    
-    // Continuous debug output
-    setInterval(() => {
-      if (!trackingStarted) {
-        debugEl.textContent = "🔄 Searching for surfaces...\nMove phone slowly side-to-side";
-      }
-    }, 2000);
   </script>
 </body>
 </html>
