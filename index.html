@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>AR Plant Placement</title>
   <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <style>
@@ -15,88 +14,111 @@
       font-family: monospace;
       z-index: 10000;
     }
-    #info-panel {
-      position: fixed;
-      bottom: 10px;
-      left: 10px;
-      background: rgba(255,255,255,0.9);
-      padding: 10px;
-      border-radius: 5px;
-      z-index: 9999;
+    #cursor {
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.5; }
+      100% { opacity: 1; }
     }
   </style>
 </head>
 <body>
-  <!-- AR Scene with surface detection -->
   <a-scene 
     embedded 
-    arjs="sourceType: webcam; trackingMethod: best; debugUIEnabled: true;"
-    vr-mode-ui="enabled: false"
+    arjs="sourceType: webcam; trackingMethod: best; debugUIEnabled: true"
+    renderer="logarithmicDepthBuffer: true;"
   >
-    <!-- Cursor that sticks to surfaces -->
-    <a-cursor 
-      id="cursor"
-      rayOrigin="mouse"
-      fuse="false"
-      material="color: yellow; shader: flat"
+    <!-- Enhanced cursor with visual feedback -->
+    <a-entity id="cursor"
+      cursor="rayOrigin: mouse"
+      raycaster="objects: [data-ar-surface]; far: 100;"
       geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.016"
-      raycaster="objects: [data-surface]"
-      cursor-listener
-    ></a-cursor>
-    
-    <!-- Plant (initially hidden) -->
-    <a-entity 
-      id="plant"
+      material="color: #00FF00; shader: flat"
+      position="0 0 -1"
+      data-ar-surface
+    ></a-entity>
+
+    <!-- Plant with physics for realistic placement -->
+    <a-entity id="plant"
       gltf-model="url(./plant.glb)"
       scale="0.5 0.5 0.5"
       visible="false"
       shadow
-      data-surface
+      data-ar-surface
     ></a-entity>
-    
+
     <a-entity camera></a-entity>
   </a-scene>
 
-  <!-- Debug info -->
-  <div id="debug">Waiting for surface detection...</div>
-  
-  <!-- Info panel -->
-  <div id="info-panel">
-    <h2>Aloe Vera</h2>
-    <p>Point at a flat surface and tap!</p>
-  </div>
+  <div id="debug">Initializing AR...</div>
 
   <script>
-    // Debugging setup
-    const debugEl = document.getElementById('debug');
+    const scene = document.querySelector('a-scene');
     const cursor = document.getElementById('cursor');
     const plant = document.getElementById('plant');
-    let lastPosition = null;
+    const debugEl = document.getElementById('debug');
     
-    // Update debug info every second
-    setInterval(() => {
-      const pos = plant.getAttribute('position');
-      debugEl.innerHTML = `Surface Tracking: ${lastPosition ? '✅' : '❌ (Move phone slowly)'}<br>
-                          Plant Position: ${pos ? `${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)}` : 'Not placed'}`;
-    }, 1000);
+    // Debug states
+    let trackingStarted = false;
+    let lastIntersection = null;
     
-    // Handle surface placement
-    AFRAME.registerComponent('cursor-listener', {
-      init: function() {
-        this.el.addEventListener('click', (evt) => {
-          if (evt.detail.intersection) {
-            lastPosition = evt.detail.intersection.point;
-            plant.setAttribute('position', lastPosition);
-            plant.setAttribute('visible', 'true');
-            
-            // Make plant stand upright (adjust Y rotation as needed)
-            plant.setAttribute('rotation', {x: 0, y: 0, z: 0});
-            
-            console.log('Plant placed at:', lastPosition);
-          }
-        });
-      }
+    // Configure raycaster properly
+    cursor.components.raycaster.far = 10;
+    cursor.components.raycaster.near = 0.05;
+    cursor.components.raycaster.showLine = true;
+    
+    // Scene loaded handler
+    scene.addEventListener('loaded', () => {
+      debugEl.textContent = "AR ready - scan surfaces slowly";
+      
+      // Visual feedback when surfaces are detected
+      scene.addEventListener('markerFound', () => {
+        trackingStarted = true;
+        cursor.setAttribute('material', 'color', '#00FF00');
+      });
+      
+      scene.addEventListener('markerLost', () => {
+        cursor.setAttribute('material', 'color', '#FF0000');
+      });
     });
+    
+    // Click handler with enhanced debugging
+    cursor.addEventListener('click', (e) => {
+      if (!e.detail.intersection) {
+        debugEl.textContent = "⚠️ No surface detected!\nMove phone slowly over textured surface";
+        cursor.setAttribute('material', 'color', '#FF0000');
+        return;
+      }
+      
+      lastIntersection = e.detail.intersection;
+      plant.setAttribute('position', lastIntersection.point);
+      
+      // Align plant with surface normal
+      plant.setAttribute('rotation', {
+        x: -Math.atan2(lastIntersection.face.normal.z, lastIntersection.face.normal.y) * (180/Math.PI),
+        y: 0,
+        z: 0
+      });
+      
+      plant.setAttribute('visible', 'true');
+      debugEl.innerHTML = `✅ Plant placed!<br>
+                          Position: ${lastIntersection.point.x.toFixed(2)}, 
+                          ${lastIntersection.point.y.toFixed(2)}, 
+                          ${lastIntersection.point.z.toFixed(2)}`;
+      
+      // Visual confirmation
+      cursor.setAttribute('material', 'color', '#00FF00');
+      setTimeout(() => cursor.setAttribute('material', 'color', '#FFFF00'), 200);
+    });
+    
+    // Continuous debug output
+    setInterval(() => {
+      if (!trackingStarted) {
+        debugEl.textContent = "🔄 Searching for surfaces...\nMove phone slowly side-to-side";
+      }
+    }, 2000);
   </script>
 </body>
 </html>
