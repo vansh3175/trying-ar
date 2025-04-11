@@ -1,74 +1,389 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>AR Plant Viewer</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
-    <style>
-      body {
-        margin: 0;
-        overflow: hidden;
-        background: #000;
-        font-family: Arial;
-      }
-
-      #info {
-        position: fixed;
-        bottom: 20px;
-        left: 0;
-        right: 0;
-        text-align: center;
-        color: white;
-        background: rgba(0, 0, 0, 0.7);
-        padding: 15px;
-        z-index: 50;
-      }
-    </style>
-  </head>
-
-  <body>
-    <div id="info">Tap to place the plant</div>
-
-    <a-scene
-      vr-mode-ui="enabled: false"
-      embedded
-      arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;"
-      renderer="logarithmicDepthBuffer: true;"
+<head>
+  <title>AR Plant Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #000;
+      font-family: Arial, sans-serif;
+      touch-action: none;
+    }
+    #loading {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.8);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+    }
+    #info {
+      position: fixed;
+      bottom: 20px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      color: white;
+      background: rgba(0,0,0,0.7);
+      padding: 15px;
+      z-index: 50;
+    }
+    #start-button {
+      padding: 15px 25px;
+      background: #2ecc71;
+      border: none;
+      border-radius: 5px;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+    #controls {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 50;
+      display: none;
+    }
+    .control-button {
+      padding: 10px 15px;
+      background: rgba(52, 152, 219, 0.8);
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #reset-button {
+      background: rgba(231, 76, 60, 0.8);
+    }
+    .size-controls {
+      display: flex;
+      gap: 5px;
+    }
+    #size-indicator {
+      background: rgba(0, 0, 0, 0.5);
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+      text-align: center;
+      margin-bottom: 5px;
+    }
+    .ar-only {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="loading">
+    <h2>AR Plant Viewer</h2>
+    <p id="status">Getting ready...</p>
+    <button id="start-button">Start AR Experience</button>
+  </div>
+  
+  <div id="controls" class="ar-only">
+    <div id="size-indicator">Size: 100%</div>
+    <div class="size-controls">
+      <button id="size-down" class="control-button">-</button>
+      <button id="size-up" class="control-button">+</button>
+    </div>
+    <button id="reset-button" class="control-button">Reset</button>
+  </div>
+  
+  <div id="info" class="ar-only">Tap on ground to place plant</div>
+  
+  <!-- AR Scene -->
+  <a-scene
+    id="ar-scene"
+    embedded
+    arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
+    vr-mode-ui="enabled: false"
+    renderer="logarithmicDepthBuffer: true; antialias: true; precision: medium;"
+    style="display: none;"
+  >
+    <!-- Default plant model -->
+    <a-assets>
+      <a-asset-item id="plant-model" src="plant.glb" response-type="arraybuffer"></a-asset-item>
+    </a-assets>
+    
+    <!-- Use a cursor for interaction -->
+    <a-entity
+      id="mouseCursor"
       cursor="rayOrigin: mouse"
-    >
-      <!-- Tapable ground -->
-      <a-entity id="tap-ground" geometry="primitive: plane; height: 100; width: 100"
-                rotation="-90 0 0"
-                material="color: transparent; opacity: 0.0;"
-                position="0 0 0">
-      </a-entity>
-
-      <!-- Plant model -->
-      <a-entity id="plant"
-                gltf-model="plant.glb"
-                scale="0.5 0.5 0.5"
-                visible="false">
-      </a-entity>
-
-      <a-camera position="0 1.6 0"></a-camera>
-    </a-scene>
-
-    <script>
-      const plant = document.getElementById("plant");
-      const ground = document.getElementById("tap-ground");
-
-      ground.addEventListener("click", function (evt) {
-        if (!plant.getAttribute("visible")) {
-          const intersection = evt.detail.intersection;
-          if (intersection) {
-            const point = intersection.point;
-            plant.setAttribute("position", point);
-            plant.setAttribute("visible", "true");
-            document.getElementById("info").textContent = "You can move around the plant now.";
+      raycaster="objects: .clickable; far: 100"
+    ></a-entity>
+    
+    <!-- The plant entity -->
+    <a-entity
+      id="plant"
+      class="clickable"
+      gltf-model="#plant-model"
+      scale="0.5 0.5 0.5"
+      visible="false"
+      position="0 0 -1"
+      rotation="0 0 0"
+      shadow="cast: true; receive: true"
+    ></a-entity>
+    
+    <!-- Environment entity for ground detection -->
+    <a-entity id="ground"></a-entity>
+    
+    <!-- Camera -->
+    <a-entity camera position="0 1.6 0" look-controls></a-entity>
+  </a-scene>
+  
+  <script>
+    // DOM elements
+    const loading = document.getElementById('loading');
+    const status = document.getElementById('status');
+    const startButton = document.getElementById('start-button');
+    const controls = document.getElementById('controls');
+    const resetButton = document.getElementById('reset-button');
+    const sizeUp = document.getElementById('size-up');
+    const sizeDown = document.getElementById('size-down');
+    const sizeIndicator = document.getElementById('size-indicator');
+    const info = document.getElementById('info');
+    const scene = document.getElementById('ar-scene');
+    const plant = document.getElementById('plant');
+    
+    let isPlaced = false;
+    let hasStarted = false;
+    let currentSize = 100; // Size in percentage (100% = default size)
+    const sizeStep = 10; // Percentage change per button press
+    const minSize = 20; // Minimum size percentage
+    const maxSize = 300; // Maximum size percentage
+    const baseScale = 0.5; // Base scale value
+    
+    // 1. Check WebGL and device capabilities
+    function checkCompatibility() {
+      try {
+        // Check for WebGL
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        
+        if (!gl) {
+          throw new Error("WebGL not supported");
+        }
+        
+        // Check for camera
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("Camera access not supported");
+        }
+        
+        return true;
+      } catch (error) {
+        status.textContent = "Error: " + error.message;
+        startButton.disabled = true;
+        startButton.textContent = "Not Compatible";
+        startButton.style.backgroundColor = "#e74c3c";
+        return false;
+      }
+    }
+    
+    // 2. Start AR experience
+    function startAR() {
+      if (hasStarted) return;
+      
+      hasStarted = true;
+      status.textContent = "Requesting camera access...";
+      
+      // Display and initialize AR scene
+      scene.style.display = 'block';
+      
+      // Request camera access
+      navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'environment',
+          width: { ideal: window.innerWidth },
+          height: { ideal: window.innerHeight }
+        } 
+      })
+      .then(stream => {
+        loading.style.display = 'none';
+        document.querySelectorAll('.ar-only').forEach(el => el.style.display = 'block');
+        controls.style.display = 'flex';
+        info.style.display = 'block';
+      })
+      .catch(error => {
+        status.textContent = "Camera access denied: " + error.message;
+        startButton.textContent = "Retry Camera Access";
+        startButton.disabled = false;
+      });
+    }
+    
+    // 3. Place the plant in AR space
+    function placePlant(x, y, z) {
+      plant.setAttribute('position', { x, y, z });
+      plant.setAttribute('visible', true);
+      isPlaced = true;
+      info.textContent = "Plant placed! Use +/- buttons to resize";
+    }
+    
+    // 4. Reset plant position
+    function resetPlant() {
+      plant.setAttribute('visible', false);
+      isPlaced = false;
+      resetSize();
+      info.textContent = "Tap on ground to place plant";
+    }
+    
+    // 5. Resize plant
+    function resizePlant(sizePercentage) {
+      const newScale = (baseScale * sizePercentage / 100).toFixed(2);
+      plant.setAttribute('scale', `${newScale} ${newScale} ${newScale}`);
+      sizeIndicator.textContent = `Size: ${sizePercentage}%`;
+    }
+    
+    // 6. Increase plant size
+    function increasePlantSize() {
+      if (!isPlaced) return;
+      currentSize = Math.min(currentSize + sizeStep, maxSize);
+      resizePlant(currentSize);
+    }
+    
+    // 7. Decrease plant size
+    function decreasePlantSize() {
+      if (!isPlaced) return;
+      currentSize = Math.max(currentSize - sizeStep, minSize);
+      resizePlant(currentSize);
+    }
+    
+    // 8. Reset to default size
+    function resetSize() {
+      currentSize = 100;
+      resizePlant(currentSize);
+    }
+    
+    // Event Listeners
+    document.addEventListener('DOMContentLoaded', function() {
+      // Check compatibility on load
+      if (checkCompatibility()) {
+        status.textContent = "Ready to start AR experience";
+        startButton.disabled = false;
+      }
+      
+      // Start button
+      startButton.addEventListener('click', startAR);
+      
+      // Reset button
+      resetButton.addEventListener('click', resetPlant);
+      
+      // Size control buttons
+      sizeUp.addEventListener('click', increasePlantSize);
+      sizeDown.addEventListener('click', decreasePlantSize);
+      
+      // Screen tap to place plant
+      document.addEventListener('click', function(event) {
+        // Ignore clicks on buttons
+        if (event.target.tagName === 'BUTTON') return;
+        
+        if (!hasStarted || !scene.style.display || scene.style.display === 'none') {
+          return;
+        }
+        
+        if (!isPlaced) {
+          // Place the plant in front of the camera
+          const camera = document.querySelector('a-entity[camera]');
+          if (camera && camera.object3D) {
+            // Get camera position
+            const cameraPosition = camera.getAttribute('position');
+            const cameraRotation = camera.object3D.rotation;
+            
+            // Calculate position 1 meter in front of camera
+            const distance = 1.5;
+            const direction = new THREE.Vector3(0, 0, -1);
+            direction.applyQuaternion(camera.object3D.quaternion);
+            
+            const plantX = cameraPosition.x + direction.x * distance;
+            // Place slightly below eye level for better visibility
+            const plantY = cameraPosition.y - 0.5;
+            const plantZ = cameraPosition.z + direction.z * distance;
+            
+            placePlant(plantX, plantY, plantZ);
           }
         }
       });
-    </script>
-  </body>
+      
+      // Handle AR scene loaded
+      scene.addEventListener('loaded', function() {
+        console.log('AR scene loaded and ready');
+      });
+    });
+    
+    // Handle resize for better viewing
+    window.addEventListener('resize', function() {
+      if (hasStarted) {
+        // Force AR camera to adapt to new size
+        const arSystem = scene.systems['arjs'];
+        if (arSystem && arSystem._arSession) {
+          arSystem._arSession.onResize();
+        }
+      }
+    });
+    
+    // Touch event handling for mobile pinch-to-zoom resize
+    let initialDistance = 0;
+    let initialSize = 0;
+    
+    document.addEventListener('touchstart', function(e) {
+      if (!isPlaced || e.touches.length !== 2) return;
+      
+      // Calculate initial distance between touch points
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      initialDistance = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+      initialSize = currentSize;
+      
+      e.preventDefault(); // Prevent default browser behavior
+    });
+    
+    document.addEventListener('touchmove', function(e) {
+      if (!isPlaced || e.touches.length !== 2 || initialDistance === 0) return;
+      
+      // Calculate new distance
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const currentDistance = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+      
+      // Calculate size change based on pinch gesture
+      const distanceRatio = currentDistance / initialDistance;
+      let newSize = Math.round(initialSize * distanceRatio);
+      
+      // Apply size limits
+      newSize = Math.max(minSize, Math.min(maxSize, newSize));
+      
+      if (newSize !== currentSize) {
+        currentSize = newSize;
+        resizePlant(currentSize);
+      }
+      
+      e.preventDefault(); // Prevent default browser behavior
+    });
+    
+    document.addEventListener('touchend', function(e) {
+      initialDistance = 0;
+    });
+  </script>
+</body>
 </html>
