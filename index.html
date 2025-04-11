@@ -1,188 +1,74 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>AR Plant Viewer with Resize</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <script src="https://cdn.jsdelivr.net/gh/aframevr/aframe@1.4.2/dist/aframe-master.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
-  <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-      background: #000;
-      font-family: Arial;
-      touch-action: none;
-    }
-    #loading {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: #000;
-      color: white;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 100;
-    }
-    #info {
-      position: fixed;
-      bottom: 20px;
-      left: 0;
-      right: 0;
-      text-align: center;
-      color: white;
-      background: rgba(0,0,0,0.7);
-      padding: 15px;
-      z-index: 50;
-    }
-    #controls {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      z-index: 50;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .control-btn {
-      width: 50px;
-      height: 50px;
-      border-radius: 50%;
-      background: rgba(0,0,0,0.5);
-      color: white;
-      border: 2px solid white;
-      font-size: 24px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-  </style>
-</head>
-<body>
-  <div id="loading">
-    <h2>AR Plant Viewer</h2>
-    <p id="status">Initializing AR...</p>
-  </div>
-
-  <div id="controls" style="display:none;">
-    <button class="control-btn" id="zoom-in">+</button>
-    <button class="control-btn" id="zoom-out">-</button>
-    <button class="control-btn" id="reset-size">↻</button>
-  </div>
-
-  <a-scene 
-    vr-mode-ui="enabled: false"
-    arjs="sourceType: webcam; trackingMethod: best; debugUIEnabled: false"
-    renderer="logarithmicDepthBuffer: true; precision: medium;"
-  >
-    <a-entity id="plant" 
-              gltf-model="plant.glb" 
-              scale="0.5 0.5 0.5" 
-              visible="false" 
-              shadow>
-    </a-entity>
-    <a-camera></a-camera>
-  </a-scene>
-
-  <div id="info" style="display:none;">Tap to place plant | Pinch to resize</div>
-
-  <script>
-    // DOM elements
-    const loading = document.getElementById('loading');
-    const status = document.getElementById('status');
-    const info = document.getElementById('info');
-    const controls = document.getElementById('controls');
-    const plant = document.getElementById('plant');
-    const zoomInBtn = document.getElementById('zoom-in');
-    const zoomOutBtn = document.getElementById('zoom-out');
-    const resetSizeBtn = document.getElementById('reset-size');
-
-    // Plant size management
-    let currentScale = 0.5;
-    const MIN_SCALE = 0.1;
-    const MAX_SCALE = 2.0;
-    const SCALE_STEP = 0.1;
-
-    // 1. Check WebAR support
-    if (!navigator.xr && !navigator.getVRDisplays) {
-      status.textContent = "AR not supported in your browser";
-      loading.innerHTML = "<h2>⚠️ AR Not Supported</h2><p>Try Chrome or Firefox on Android</p>";
-      throw new Error("WebXR not supported");
-    }
-
-    // 2. Handle scene load
-    document.querySelector('a-scene').addEventListener('loaded', function() {
-      navigator.mediaDevices.getUserMedia({ video: true })
-        .then(() => {
-          status.textContent = "Ready!";
-          setTimeout(() => {
-            loading.style.display = 'none';
-            info.style.display = 'block';
-            controls.style.display = 'flex';
-          }, 1000);
-        })
-        .catch(err => {
-          status.textContent = "Camera blocked: " + err.message;
-          loading.innerHTML = "<h2>⚠️ Camera Required</h2><p>Please enable camera permissions</p>";
-        });
-    });
-
-    // 3. Tap-to-place functionality
-    document.querySelector('a-scene').addEventListener('click', function(evt) {
-      if (!plant.getAttribute('visible')) {
-        plant.setAttribute('position', '0 0 -1');
-        plant.setAttribute('visible', 'true');
-        info.textContent = "Plant placed! Tap to move | Pinch to resize";
-      } else if (evt.detail.intersection) {
-        plant.setAttribute('position', evt.detail.intersection.point);
+  <head>
+    <title>AR Plant Viewer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: #000;
+        font-family: Arial;
       }
-    });
 
-    // 4. Button controls for resizing
-    zoomInBtn.addEventListener('click', () => {
-      if (currentScale < MAX_SCALE) {
-        currentScale += SCALE_STEP;
-        plant.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+      #info {
+        position: fixed;
+        bottom: 20px;
+        left: 0;
+        right: 0;
+        text-align: center;
+        color: white;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 15px;
+        z-index: 50;
       }
-    });
+    </style>
+  </head>
 
-    zoomOutBtn.addEventListener('click', () => {
-      if (currentScale > MIN_SCALE) {
-        currentScale -= SCALE_STEP;
-        plant.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
-      }
-    });
+  <body>
+    <div id="info">Tap to place the plant</div>
 
-    resetSizeBtn.addEventListener('click', () => {
-      currentScale = 0.5;
-      plant.setAttribute('scale', '0.5 0.5 0.5');
-    });
+    <a-scene
+      vr-mode-ui="enabled: false"
+      embedded
+      arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;"
+      renderer="logarithmicDepthBuffer: true;"
+      cursor="rayOrigin: mouse"
+    >
+      <!-- Tapable ground -->
+      <a-entity id="tap-ground" geometry="primitive: plane; height: 100; width: 100"
+                rotation="-90 0 0"
+                material="color: transparent; opacity: 0.0;"
+                position="0 0 0">
+      </a-entity>
 
-    // 5. Pinch-to-zoom gesture support
-    const sceneEl = document.querySelector('a-scene');
-    const mc = new Hammer(sceneEl);
+      <!-- Plant model -->
+      <a-entity id="plant"
+                gltf-model="plant.glb"
+                scale="0.5 0.5 0.5"
+                visible="false">
+      </a-entity>
 
-    mc.get('pinch').set({ enable: true });
-    
-    mc.on('pinch', function(e) {
-      if (plant.getAttribute('visible')) {
-        // Calculate new scale based on pinch
-        const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, currentScale * e.scale));
-        currentScale = newScale;
-        plant.setAttribute('scale', `${newScale} ${newScale} ${newScale}`);
-      }
-    });
+      <a-camera position="0 1.6 0"></a-camera>
+    </a-scene>
 
-    // 6. Timeout fallback
-    setTimeout(() => {
-      if (loading.style.display !== 'none') {
-        status.textContent = "Having trouble? Try refreshing";
-      }
-    }, 10000);
-  </script>
-</body>
+    <script>
+      const plant = document.getElementById("plant");
+      const ground = document.getElementById("tap-ground");
+
+      ground.addEventListener("click", function (evt) {
+        if (!plant.getAttribute("visible")) {
+          const intersection = evt.detail.intersection;
+          if (intersection) {
+            const point = intersection.point;
+            plant.setAttribute("position", point);
+            plant.setAttribute("visible", "true");
+            document.getElementById("info").textContent = "You can move around the plant now.";
+          }
+        }
+      });
+    </script>
+  </body>
 </html>
