@@ -1,17 +1,18 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
   <title>AR Plant Viewer</title>
-  <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+  <!-- Load all required libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/three.js/build/ar-threex.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/three.js/build/ar.js"></script>
   <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-      font-family: Arial;
+    body { 
+      margin: 0; 
+      overflow: hidden; 
     }
-    #instructions {
+    #info {
       position: fixed;
       bottom: 20px;
       left: 0;
@@ -19,63 +20,131 @@
       text-align: center;
       color: white;
       background: rgba(0,0,0,0.6);
-      padding: 15px;
+      padding: 10px;
+      font-family: Arial;
+    }
+    #loading {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.8);
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
       z-index: 100;
     }
   </style>
 </head>
 <body>
-  <!-- AR Scene -->
-  <a-scene 
-    embedded 
-    arjs="sourceType: webcam; trackingMethod: best;"
-    vr-mode-ui="enabled: false"
-    renderer="logarithmicDepthBuffer: true;"
-  >
-    <!-- Your Plant Model -->
-    <a-entity id="plant"
-      gltf-model="url(plant.glb)"
-      scale="0.5 0.5 0.5"
-      visible="false"
-      shadow
-    ></a-entity>
-    
-    <a-entity camera></a-entity>
-  </a-scene>
-
-  <!-- Instructions -->
-  <div id="instructions">
-    Move your phone slowly to detect surfaces<br>
-    Tap to place your plant
-  </div>
+  <div id="loading">Initializing AR... (Please allow camera access)</div>
+  <div id="ar-container"></div>
+  <div id="info">Point at a flat surface and tap to place plant</div>
 
   <script>
-    const scene = document.querySelector('a-scene');
-    const plant = document.getElementById('plant');
-    const instructions = document.getElementById('instructions');
+    // Show loading screen
+    const loading = document.getElementById('loading');
+    const info = document.getElementById('info');
     
-    // Handle surface tapping
-    scene.addEventListener('click', (e) => {
-      if (e.detail.intersection) {
-        const point = e.detail.intersection.point;
-        
-        // Place plant at intersection point
-        plant.setAttribute('position', point);
-        plant.setAttribute('visible', 'true');
-        plant.setAttribute('rotation', { x: 0, y: Math.random() * 360, z: 0 });
-        
-        // Visual feedback
-        instructions.innerHTML = "Plant placed!<br>Tap elsewhere to move it";
-        instructions.style.background = 'rgba(0,150,0,0.7)';
-      } else {
-        instructions.innerHTML = "No surface detected<br>Try a different angle";
-        instructions.style.background = 'rgba(150,0,0,0.7)';
-      }
-      
-      setTimeout(() => {
-        instructions.style.background = 'rgba(0,0,0,0.6)';
-      }, 1000);
+    // 1. Set up Three.js scene
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    document.getElementById('ar-container').appendChild(renderer.domElement);
+
+    // 2. Initialize AR.js properly
+    const arToolkitSource = new THREEx.ArToolkitSource({
+      sourceType: 'webcam',
+      sourceWidth: window.innerWidth,
+      sourceHeight: window.innerHeight,
+      displayWidth: window.innerWidth,
+      displayHeight: window.innerHeight
     });
+
+    const arToolkitContext = new THREEx.ArToolkitContext({
+      cameraParametersUrl: 'https://arjs-cors-proxy.herokuapp.com/https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/data/camera_para.dat',
+      detectionMode: 'mono',
+      maxDetectionRate: 60,
+      canvasWidth: window.innerWidth,
+      canvasHeight: window.innerHeight
+    });
+
+    // 3. Add lighting
+    const light = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(light);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(0, 10, 10);
+    scene.add(directionalLight);
+
+    // 4. Load your plant model
+    const loader = new THREE.GLTFLoader();
+    let plant;
+    
+    loader.load(
+      'plant.glb', 
+      (gltf) => {
+        plant = gltf.scene;
+        plant.scale.set(0.5, 0.5, 0.5);
+        plant.visible = false;
+        scene.add(plant);
+        loading.style.display = 'none';
+      },
+      undefined,
+      (error) => {
+        console.error('Error loading model:', error);
+        info.textContent = "Failed to load plant model";
+      }
+    );
+
+    // 5. Handle window resize
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // 6. Handle taps
+    renderer.domElement.addEventListener('click', (e) => {
+      if (!plant) return;
+      
+      // Place plant 0.5 meters in front of camera
+      const position = new THREE.Vector3(0, 0, -0.5);
+      position.applyMatrix4(camera.matrixWorld);
+      
+      plant.position.copy(position);
+      plant.quaternion.copy(camera.quaternion);
+      plant.visible = true;
+      
+      info.textContent = "Plant placed! Move around to view";
+    });
+
+    // 7. Animation loop
+    function animate() {
+      requestAnimationFrame(animate);
+      if (arToolkitSource.ready) {
+        arToolkitContext.update(arToolkitSource.domElement);
+        scene.visible = true;
+        renderer.render(scene, camera);
+      }
+    }
+    
+    // Start AR
+    arToolkitSource.init(() => {
+      onResize();
+      arToolkitContext.init(() => {
+        camera.projectionMatrix.copy(arToolkitContext.getProjectionMatrix());
+        animate();
+      });
+    });
+
+    function onResize() {
+      arToolkitSource.onResizeElement();
+      arToolkitSource.copyElementSizeTo(renderer.domElement);
+    }
   </script>
 </body>
 </html>
